@@ -19,7 +19,8 @@ app.add_middleware(
 tesseract_path = "/usr/bin/tesseract"
 if os.path.exists(tesseract_path):
     pytesseract.pytesseract.tesseract_cmd = tesseract_path
-
+else:
+    raise Exception("Tesseract is not installed or not found in the system path.")
 @app.get("/")
 async def home():
     return {"message": "OCR API is running!"}
