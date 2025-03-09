@@ -1,11 +1,12 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 import pytesseract
 from PIL import Image
 import io
 import cv2
 import numpy as np
-from fastapi.middleware.cors import CORSMiddleware
 import os
+import re
 
 app = FastAPI()
 
@@ -23,44 +24,38 @@ if os.path.exists(tesseract_path):
 else:
     raise Exception("Tesseract is not installed or not found in the system path.")
 
-def preprocess_image(image):
-    # تحويل الصورة إلى تدرج رمادي
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    # تحسين التباين باستخدام CLAHE (Contrast Limited Adaptive Histogram Equalization)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray = clahe.apply(gray)
-    
-    # تقليل الضوضاء باستخدام Gaussian Blur
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    
-    # استخدام Adaptive Thresholding لتحويل الصورة إلى ثنائية (أسود وأبيض)
-    thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
-    
-    return thresh
-
 @app.get("/")
 async def home():
     return {"message": "OCR API is running!"}
 
+def preprocess_image(image):
+    img = np.array(image)
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    blurred = cv2.GaussianBlur(thresh, (5,5), 0)
+
+    return Image.fromarray(blurred)
+
+def clean_text(text):
+    cleaned_text = re.sub(r'[^أ-يA-Za-z0-9 ]', '', text)
+    return cleaned_text.strip()
+
 @app.post("/ocr/")
 async def extract_text(image: UploadFile = File(...)):
     try:
-        # قراءة الصورة من الملف المرفوع
         image_data = await image.read()
-        image_array = np.frombuffer(image_data, np.uint8)
-        img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
         
-        # تحسين جودة الصورة
-        processed_image = preprocess_image(img)
-        
-        # تحويل الصورة المعالجة إلى صيغة PIL لاستخدامها مع pytesseract
-        pil_image = Image.fromarray(processed_image)
-        
-        # استخراج النص باستخدام Tesseract مع تحسين الإعدادات
-        custom_config = r'--psm 6 -l ara+eng'  # PSM 6 يفترض أن الصورة تحتوي على فقرة واحدة من النص
-        text = pytesseract.image_to_string(pil_image, config=custom_config)
-        
-        return {"extracted_text": text.strip()}
+        img = Image.open(io.BytesIO(image_data))
+
+        processed_img = preprocess_image(img)
+
+        text = pytesseract.image_to_string(processed_img, lang="ara+eng")
+
+        final_text = clean_text(text)
+
+        return {"extracted_text": final_text}
     except Exception as e:
         return {"error": str(e)}
