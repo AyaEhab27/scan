@@ -1,10 +1,11 @@
 from fastapi import FastAPI, UploadFile, File
 import pytesseract
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image
 import io
+import cv2
+import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import shutil
 
 app = FastAPI()
 
@@ -22,15 +23,17 @@ if os.path.exists(tesseract_path):
 else:
     raise Exception("Tesseract is not installed or not found in the system path.")
 
-def preprocess_image(img):
-    img = img.convert('L')
+def preprocess_image(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
-    enhancer = ImageEnhance.Contrast(img)
-    img = enhancer.enhance(2)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    gray = clahe.apply(gray)
     
-    img = img.filter(ImageFilter.MedianFilter(size=3))
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     
-    return img
+    thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+    
+    return thresh
 
 @app.get("/")
 async def home():
@@ -40,12 +43,16 @@ async def home():
 async def extract_text(image: UploadFile = File(...)):
     try:
         image_data = await image.read()
-        img = Image.open(io.BytesIO(image_data))
+        image_array = np.frombuffer(image_data, np.uint8)
+        img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
         
-        img = preprocess_image(img)
+        processed_image = preprocess_image(img)
         
-        text = pytesseract.image_to_string(img, lang="ara+eng")
-
+        pil_image = Image.fromarray(processed_image)
+        
+        custom_config = r'--psm 6 -l ara+eng' 
+        text = pytesseract.image_to_string(pil_image, config=custom_config)
+        
         return {"extracted_text": text.strip()}
     except Exception as e:
         return {"error": str(e)}
