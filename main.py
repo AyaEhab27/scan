@@ -35,6 +35,14 @@ def preprocess_image(image):
     
     return thresh
 
+def detect_language(image):
+    try:
+        osd = pytesseract.image_to_osd(image)
+        language = osd.split("\n")[1].split(":")[1].strip()
+        return "ara" if language == "Arabic" else "eng"
+    except:
+        return "eng"
+
 @app.get("/")
 async def home():
     return {"message": "OCR API is running!"}
@@ -50,9 +58,11 @@ async def extract_text(image: UploadFile = File(...)):
         
         pil_image = Image.fromarray(processed_image)
         
-        custom_config = r'--psm 6 -l ara+eng' 
-        text = pytesseract.image_to_string(pil_image, config=custom_config)
+        language = detect_language(pil_image)
         
-        return {"extracted_text": text.strip()}
+        custom_config = r'--psm 6 -c tessedit_char_whitelist=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ء-ي '  # تجاهل الرموز والأشكال
+        text = pytesseract.image_to_string(pil_image, config=custom_config, lang=language)
+        
+        return {"extracted_text": text.strip(), "detected_language": language}
     except Exception as e:
         return {"error": str(e)}
