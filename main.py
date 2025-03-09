@@ -20,7 +20,7 @@ app.add_middleware(
 )
 
 # تحديد مسار Tesseract
-tesseract_path = "/usr/bin/tesseract"  # إذا كنت على Windows غيّره إلى مسار التثبيت
+tesseract_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 if os.path.exists(tesseract_path):
     pytesseract.pytesseract.tesseract_cmd = tesseract_path
 else:
