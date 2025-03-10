@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException
 import pytesseract
 from PIL import Image
 import io
@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import cv2
 import numpy as np
+import re
 
 app = FastAPI()
 
@@ -34,6 +35,18 @@ def preprocess_image(image):
     
     return binary
 
+def detect_language(text):
+    arabic_pattern = re.compile(r'[\u0600-\u06FF]')  
+    if arabic_pattern.search(text):
+        return "ara" 
+    else:
+        return "eng"  
+
+def clean_text(text):
+    allowed_chars = r"[^a-zA-Z0-9\u0600-\u06FF\s]"
+    cleaned_text = re.sub(allowed_chars, "", text)
+    return cleaned_text.strip()
+
 @app.get("/")
 async def home():
     return {"message": "OCR API is running!"}
@@ -48,11 +61,15 @@ async def extract_text(image: UploadFile = File(...)):
         
         processed_img = preprocess_image(img_cv)
         
-        allowed_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ءآأؤإئابةتثجحخدذرزسشصضطظعغفقكلمنهوىي َُِّّْ"
+        initial_text = pytesseract.image_to_string(processed_img, lang="ara+eng")
         
-        custom_config = f'--oem 3 --psm 6 -c tessedit_char_whitelist={allowed_chars}'
-        text = pytesseract.image_to_string(processed_img, lang="ara+eng", config=custom_config)
+        language = detect_language(initial_text)
         
-        return {"extracted_text": text.strip()}
+        final_text = pytesseract.image_to_string(processed_img, lang=language)
+        
+        cleaned_text = clean_text(final_text)
+        
+        return {"extracted_text": cleaned_text}
+    
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
