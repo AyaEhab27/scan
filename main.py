@@ -25,7 +25,10 @@ else:
     raise Exception("Tesseract is not installed or not found in the system path.")
 
 def preprocess_image(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    if len(image.shape) == 2:  
+        gray = image
+    else:  
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
     gray = cv2.equalizeHist(gray)
     
