@@ -4,14 +4,18 @@ FROM python:3.9-slim
 # تثبيت التبعيات النظامية (Tesseract ومكتباته)
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
-    tesseract-ocr-ara \
-    tesseract-ocr-eng \
-    libtesseract-dev \
-    libleptonica-dev \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
+# إنشاء مجلد ملفات اللغة
+RUN mkdir -p /usr/share/tesseract-ocr/tessdata
+
+# تحميل ملفات اللغة يدويًا (ara.traineddata و eng.traineddata)
+RUN wget -O /usr/share/tesseract-ocr/tessdata/ara.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/ara.traineddata && \
+    wget -O /usr/share/tesseract-ocr/tessdata/eng.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/eng.traineddata
+
 # تعيين مسار ملفات اللغة (TESSDATA_PREFIX)
-ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/tessdata
 
 # إنشاء مجلد العمل
 WORKDIR /app
