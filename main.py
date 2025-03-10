@@ -86,7 +86,8 @@ async def extract_text(image: UploadFile = File(...)):
         language = detect_language(initial_text)
         
         # استخراج النص مرة أخرى باستخدام اللغة المحددة
-        final_text = pytesseract.image_to_string(processed_img, lang=language)
+        custom_config = f'--oem 3 --psm 6 -c preserve_interword_spaces=1'
+        final_text = pytesseract.image_to_string(processed_img, lang=language, config=custom_config)
         
         # تنظيف النص من الرموز غير المرغوب فيها
         cleaned_text = clean_text(final_text)
