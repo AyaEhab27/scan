@@ -42,6 +42,11 @@ def preprocess_image(image):
 def clean_text(text):
     allowed_chars = r"[^a-zA-Z0-9\u0600-\u06FF\s]"
     cleaned_text = re.sub(allowed_chars, "", text)
+    
+    cleaned_text = cleaned_text.replace("\n", " ")
+    
+    cleaned_text = " ".join(cleaned_text.split())
+    
     return cleaned_text.strip()
 
 @app.get("/")
